@@ -91,10 +91,17 @@ const initialForms: ContactForm[] = [
 ];
 
 const App: React.FC = () => {
+  const [isAdmin, setIsAdmin] = useState(false);
   const [view, setView] = useState<'dashboard' | 'editor' | 'preview'>('dashboard');
   const [forms, setForms] = useState<ContactForm[]>(initialForms);
   const [editingFormId, setEditingFormId] = useState<string | null>(null);
   const [previewingFormId, setPreviewingFormId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const adminParam = urlParams.get('admin');
+    setIsAdmin(adminParam === 'true');
+  }, []);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -105,6 +112,9 @@ const App: React.FC = () => {
           setPreviewingFormId(formId);
           setView('preview');
         }
+      } else if (isAdmin) {
+        setView('dashboard');
+        setPreviewingFormId(null);
       } else {
         setView('dashboard');
         setPreviewingFormId(null);
@@ -115,7 +125,7 @@ const App: React.FC = () => {
     handleHashChange(); // Initial check on load
     
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [forms]);
+  }, [forms, isAdmin]);
 
 
   const goToDashboard = () => {
@@ -185,6 +195,17 @@ const App: React.FC = () => {
 
   if (view === 'preview' && formToPreview) {
       return <Preview form={formToPreview} closePreview={handleClosePreview} />
+  }
+
+  if (!isAdmin) {
+    return (
+      <MainLayout>
+        <div className="text-center p-12 text-gray-500">
+          <h1 className="text-2xl font-bold mb-4">방문자 모드</h1>
+          <p>폼을 미리 보려면 올바른 미리보기 링크가 필요합니다.</p>
+        </div>
+      </MainLayout>
+    )
   }
   
   const formToEdit = forms.find(form => form.id === editingFormId);
