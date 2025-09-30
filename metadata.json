@@ -1,0 +1,5 @@
+{
+  "name": "WordPress Contact Form 7 Generator",
+  "description": "An intuitive tool for visually building Contact Form 7 forms and generating the necessary shortcodes and PHP code for your WordPress site. Add fields, configure options, and copy the ready-to-use code snippets.",
+  "requestFramePermissions": []
+}
