@@ -43,7 +43,7 @@ const initialForms: ContactForm[] = [
         title: '문의 양식 1',
         steps: [{ id: 1, title: 'Step 1', content: initialFormContent }],
         mail: {
-            to: '[_site_admin_email]',
+            to: import.meta.env.VITE_ADMIN_EMAIL || '[_site_admin_email]',
             from: '[_site_title] <wordpress@example.com>',
             subject: '[_site_title] "[your-subject]"',
             headers: 'Reply-To: [your-email]',
