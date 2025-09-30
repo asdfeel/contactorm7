@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import FormFieldEditor from './components/FormFieldEditor';
 import Preview from './components/Preview';
 import { ContactForm } from './types';
 
-const MainLayout: React.FC<{ onLogout: () => void; children: React.ReactNode }> = ({ onLogout, children }) => (
+const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="bg-brand-gray min-h-screen">
         <header className="bg-brand-dark shadow-md sticky top-0 z-10">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -13,12 +12,6 @@ const MainLayout: React.FC<{ onLogout: () => void; children: React.ReactNode }> 
                     <h1 className="text-xl font-bold text-white">
                         WordPress Contact Form 7 Generator
                     </h1>
-                    <button 
-                        onClick={onLogout}
-                        className="px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-brand-dark bg-white hover:bg-gray-200"
-                    >
-                        로그아웃
-                    </button>
                 </div>
             </div>
         </header>
@@ -98,7 +91,6 @@ const initialForms: ContactForm[] = [
 ];
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [view, setView] = useState<'dashboard' | 'editor' | 'preview'>('dashboard');
   const [forms, setForms] = useState<ContactForm[]>(initialForms);
   const [editingFormId, setEditingFormId] = useState<string | null>(null);
@@ -113,7 +105,7 @@ const App: React.FC = () => {
           setPreviewingFormId(formId);
           setView('preview');
         }
-      } else if (isAuthenticated) {
+      } else {
         setView('dashboard');
         setPreviewingFormId(null);
       }
@@ -123,14 +115,8 @@ const App: React.FC = () => {
     handleHashChange(); // Initial check on load
     
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [forms, isAuthenticated]);
+  }, [forms]);
 
-
-  const handleLogin = () => setIsAuthenticated(true);
-  const handleLogout = () => {
-      window.location.hash = '';
-      setIsAuthenticated(false);
-  }
 
   const goToDashboard = () => {
     if (window.location.hash) {
@@ -200,10 +186,6 @@ const App: React.FC = () => {
   if (view === 'preview' && formToPreview) {
       return <Preview form={formToPreview} closePreview={handleClosePreview} />
   }
-
-  if (!isAuthenticated) {
-    return <Auth onLogin={handleLogin} />;
-  }
   
   const formToEdit = forms.find(form => form.id === editingFormId);
 
@@ -234,7 +216,7 @@ const App: React.FC = () => {
 
 
   return (
-    <MainLayout onLogout={handleLogout}>
+    <MainLayout>
         {renderContent()}
     </MainLayout>
   );
