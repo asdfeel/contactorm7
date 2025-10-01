@@ -3,6 +3,8 @@ import Dashboard from './components/Dashboard';
 import FormFieldEditor from './components/FormFieldEditor';
 import Preview from './components/Preview';
 import { ContactForm } from './types';
+import { db } from './firebase'; // Ensure db is imported
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
 const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="bg-brand-gray min-h-screen">
@@ -36,67 +38,79 @@ const initialFormContent = `<label> <b>이름</b> (필수) </label>
     
 [submit "제출"]`;
 
+const defaultMailSettings = {
+  to: 'your-email@example.com',
+  from: 'your-name <your-email@example.com>',
+  subject: '새 문의 양식 제출',
+  headers: 'Reply-To: [your-email]',
+  body: '다음 메시지가 [your-name]님으로부터 왔습니다.\n[your-email]\n[your-message]',
+};
 
-const initialForms: ContactForm[] = [
-    {
-        id: '15cbc5d',
-        title: '문의 양식 1',
-        steps: [{ id: 1, title: 'Step 1', content: initialFormContent }],
-        mail: {
-            to: import.meta.env.VITE_ADMIN_EMAIL || '[_site_admin_email]',
-            from: '[_site_title] <wordpress@example.com>',
-            subject: '[_site_title] "[your-subject]"',
-            headers: 'Reply-To: [your-email]',
-            body: `발신: [your-name] <[your-email]>
+const defaultMessages = {
+  success: '메시지가 성공적으로 전송되었습니다.',
+  error: '메시지를 보내는 중 오류가 발생했습니다. 나중에 다시 시도하십시오.',
+  validation: '유효성 검사 오류가 발생했습니다. 필드를 확인하고 다시 시도하십시오.',
+  spam: '스팸으로 표시된 메시지입니다.',
+  acceptance_missing: '필수 동의 필드를 수락해야 합니다.',
+  invalid_required: '필수 필드를 입력하십시오.',
+  upload_failed_not_allowed: '이 파일 형식은 허용되지 않습니다.',
+  upload_failed: '파일 업로드에 실패했습니다.',
+  invalid_date: '날짜 형식이 잘못되었습니다.',
+  date_too_early: '날짜가 너무 이릅니다.',
+  date_too_late: '날짜가 너무 늦습니다.',
+  invalid_number: '숫자 형식이 잘못되었습니다.',
+  number_too_small: '숫자가 너무 작습니다.',
+  number_too_large: '숫자가 너무 큽니다.',
+  quiz_not_answered: '퀴즈를 풀어야 합니다.',
+  invalid_email: '이메일 주소가 잘못되었습니다.',
+  invalid_url: 'URL 형식이 잘못되었습니다.',
+  invalid_tel: '전화번호 형식이 잘못되었습니다.',
+  max_length: '입력한 내용이 너무 깁니다.',
+  min_length: '입력한 내용이 너무 짧습니다.',
+};
 
-제목: [your-subject]
+const defaultMultiStepSettings = {
+  nextButtonText: '다음',
+  prevButtonText: '이전',
+};
 
-메시지 본문:
-[your-message]
-
--- 
-귀하의 웹사이트([_site_title] [_site_url])에서 문의 양식이 제출되었다는 알림입니다.`
-        },
-        messages: {
-          success: '메시지를 보내주셔서 감사합니다. 발송을 완료했습니다.',
-          error: '메시지를 보내지 못했습니다. 나중에 다시 시도해주세요.',
-          validation: '하나 이상의 항목에 오류가 있습니다. 재확인 후 다시 시도해주세요.',
-          spam: '제출을 스팸으로 간주했습니다',
-          acceptance_missing: '메시지를 보내기 전에 먼저 조건에 동의하셔야 합니다.',
-          invalid_required: '이 입력란을 채워주세요.',
-          upload_failed_not_allowed: '알 수 없는 사유로 파일 업로드에 실패했습니다',
-          upload_failed: 'PHP 오류로 파일 업로드에 실패했습니다.',
-          invalid_date: '보내는 사람이 입력한 날짜 형식이 유효하지 않습니다',
-          date_too_early: '날짜가 최소 허용치보다 이전입니다.',
-          date_too_late: '날짜가 최대 허용치보다 나중입니다.',
-          invalid_number: '보내는 사람이 입력한 숫자 양식이 유효하지 않습니다',
-          number_too_small: '숫자가 최소 허용치보다 작습니다.',
-          number_too_large: '숫자가 최대 허용치보다 큽니다.',
-          quiz_not_answered: '사용자에 대한 올바른 답을 입력하지 않습니다.',
-          invalid_email: '보내는 사람이 입력한 이메일 주소가 유효하지 않습니다',
-          invalid_url: '보내는 사람이 입력한 URL이 유효하지 않습니다',
-          invalid_tel: '보내는 사람이 입력한 전화번호가 유효하지 않습니다',
-          max_length: '이 입력란의 내용이 너무 깁니다.',
-          min_length: '이 입력란의 내용이 너무 짧습니다.',
-        },
-        multiStepSettings: {
-            nextButtonText: 'Next',
-            prevButtonText: 'Previous',
-        },
-        conditionalFieldsSettings: {
-            logic: '',
-        },
-        date: '2025/09/30 9:44 pm'
-    }
-];
+const defaultConditionalFieldsSettings = {
+  logic: '',
+};
 
 const App: React.FC = () => {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true); // New loading state
   const [view, setView] = useState<'dashboard' | 'editor' | 'preview'>('dashboard');
-  const [forms, setForms] = useState<ContactForm[]>(initialForms);
+  const [forms, setForms] = useState<ContactForm[]>([]); // Initial state is empty, will load from Firestore
   const [editingFormId, setEditingFormId] = useState<string | null>(null);
   const [previewingFormId, setPreviewingFormId] = useState<string | null>(null);
 
+  // useEffect to load forms from Firestore
+  useEffect(() => {
+    const fetchForms = async () => {
+      setLoading(true);
+      try {
+        const querySnapshot = await getDocs(collection(db, 'forms'));
+        const fetchedForms: ContactForm[] = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data() as Omit<ContactForm, 'id'>
+        }));
+        setForms(fetchedForms);
+      } catch (error) {
+        console.error("Error fetching forms: ", error);
+        // Optionally, set an error state here
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchForms();
+  }, []);
+
+  // The isAdmin state and its useEffect are no longer needed for access control,
+  // but keeping it for now to avoid breaking other parts if they rely on it.
+  // It can be removed if confirmed not needed.
+  const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const adminParam = urlParams.get('admin');
@@ -142,10 +156,10 @@ const App: React.FC = () => {
           id: new Date().getTime().toString(16),
           title: `새 문의 양식 ${forms.length + 1}`,
           steps: [{ id: 1, title: 'Step 1', content: '' }],
-          mail: initialForms[0].mail,
-          messages: initialForms[0].messages,
-          multiStepSettings: initialForms[0].multiStepSettings,
-          conditionalFieldsSettings: initialForms[0].conditionalFieldsSettings,
+          mail: defaultMailSettings,
+          messages: defaultMessages,
+          multiStepSettings: defaultMultiStepSettings,
+          conditionalFieldsSettings: defaultConditionalFieldsSettings,
           date: new Date().toLocaleString('ko-KR'),
       };
       setForms(prevForms => [...prevForms, newForm]);
