@@ -197,16 +197,7 @@ const App: React.FC = () => {
       return <Preview form={formToPreview} closePreview={handleClosePreview} />
   }
 
-  if (!isAdmin) {
-    return (
-      <MainLayout>
-        <div className="text-center p-12 text-gray-500">
-          <h1 className="text-2xl font-bold mb-4">방문자 모드</h1>
-          <p>폼을 미리 보려면 올바른 미리보기 링크가 필요합니다.</p>
-        </div>
-      </MainLayout>
-    )
-  }
+
   
   const formToEdit = forms.find(form => form.id === editingFormId);
 

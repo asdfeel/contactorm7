@@ -1,70 +1,53 @@
-import React, { useState } from 'react';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { auth, db } from '../firebase'; // db import 추가
+import { User, onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore'; // Firestore 함수 import
 
-interface AuthProps {
-  onLogin: () => void;
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  isAdmin: boolean; // isAdmin 상태 추가
 }
 
-const Auth: React.FC<AuthProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-  const handleLogin = async () => {
-    const auth = getAuth();
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      onLogin();
-    } catch (error) { 
-      if (error instanceof Error) {
-        setError(error.message);
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false); // isAdmin 상태 초기화
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        // 사용자 로그인 시 관리자 여부 확인
+        const adminDocRef = doc(db, 'admins', currentUser.uid);
+        const adminDocSnap = await getDoc(adminDocRef);
+        setIsAdmin(adminDocSnap.exists());
+      } else {
+        setIsAdmin(false); // 로그아웃 시 isAdmin 초기화
       }
-    }
-  };
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
-      <div className="p-8 bg-white rounded shadow-md w-96">
-        <h2 className="text-2xl font-bold mb-4">Login</h2>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
-            Email
-          </label>
-          <input
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            id="email"
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-        <div className="mb-6">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
-            Password
-          </label>
-          <input
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
-            id="password"
-            type="password"
-            placeholder="******************"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <button
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-            type="button"
-            onClick={handleLogin}
-          >
-            Sign In
-          </button>
-        </div>
-      </div>
-    </div>
+    <AuthContext.Provider value={{ user, loading, isAdmin }}>
+      {children}
+    </AuthContext.Provider>
   );
 };
 
-export default Auth;
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
